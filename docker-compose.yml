@@ -67,7 +67,7 @@ services:
       centraldb:
         condition: service_healthy
     networks:
-      - dbcollect_network
+      - internal
     volumes:
       - ./logs:/app/logs
       - /etc/localtime:/etc/localtime:ro
