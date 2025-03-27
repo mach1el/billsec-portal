@@ -60,7 +60,7 @@ services:
     restart: unless-stopped
     environment:
       - DJANGO_DB_CONN=${DJANGO_DB_CONN}
-      - DATA_CENTRAL_CONN={$DATA_CENTRAL_CONN}
+      - DATA_CENTRAL_CONN=$DATA_CENTRAL_CONN
     depends_on:
       maindb:
         condition: service_healthy
