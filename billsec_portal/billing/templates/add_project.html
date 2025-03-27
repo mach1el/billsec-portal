@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block title %}Add Project - Billsec Portal{% endblock %}
+
+{% block content %}
+  <div class="container mt-4">
+    <div class="card p-4 shadow-sm">
+      <h2 class="text-primary"><i class="fas fa-database"></i> Add Project</h2>
+      <p class="text-muted">Enter the database connection details for the project.</p>
+
+      <!-- Error & Success Messages -->
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-danger{% endif %}">
+            {{ message }}
+          </div>
+        {% endfor %}
+      {% endif %}
+
+      <form method="post" id="project-form">
+        {% csrf_token %}
+        <div class="row">
+          <div class="col-md-4">
+            <label for="db_host" class="form-label">Database Host</label>
+            <input type="text" id="db_host" name="db_host" class="form-control" placeholder="e.g. 192.168.1.100" required>
+            <div class="invalid-feedback">Please enter a valid database host.</div>
+          </div>
+          <div class="col-md-4">
+            <label for="db_port" class="form-label">Database Port</label>
+            <input type="number" id="db_port" name="db_port" class="form-control" placeholder="e.g. 5432" min="0" max="65535" required>
+            <div class="invalid-feedback">Port must be between 0 and 65535.</div>
+          </div>
+          <div class="col-md-4">
+            <label for="db_schema" class="form-label">Database Schema</label>
+            <input type="text" id="db_schema" name="db_schema" class="form-control" placeholder="e.g. public" required>
+            <div class="invalid-feedback">Please enter a valid schema.</div>
+          </div>
+        </div>
+        
+        <div class="row mt-3">
+          <div class="col-md-6">
+            <label for="db_user" class="form-label">Database User</label>
+            <input type="text" id="db_user" name="db_user" class="form-control" placeholder="e.g. admin" required>
+            <div class="invalid-feedback">Please enter a database user.</div>
+          </div>
+          <div class="col-md-6">
+            <label for="db_password" class="form-label">Database Password</label>
+            <input type="password" id="db_password" name="db_password" class="form-control" placeholder="Enter password" required>
+            <div class="invalid-feedback">Password cannot be empty.</div>
+          </div>
+        </div>
+
+        <div class="mt-4 text-end">
+          <button type="submit" class="btn btn-soft-violet"><i class="fas fa-save"></i> Save Project</button>
+          <a href="{% url 'billing:home' %}" class="btn btn-outline-secondary"><i class="fas fa-times"></i> Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Frontend Form Validation -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      let form = document.getElementById("project-form");
+      form.addEventListener("submit", function(event) {
+        let isValid = true;
+
+        // Validate Host
+        let dbHost = document.getElementById("db_host");
+        if (dbHost.value.trim() === "") {
+          dbHost.classList.add("is-invalid");
+          isValid = false;
+        } else {
+          dbHost.classList.remove("is-invalid");
+        }
+
+        // Validate Port
+        let dbPort = document.getElementById("db_port");
+        if (dbPort.value < 0 || dbPort.value > 65535 || dbPort.value.trim() === "") {
+          dbPort.classList.add("is-invalid");
+          isValid = false;
+        } else {
+          dbPort.classList.remove("is-invalid");
+        }
+
+        // Validate Schema
+        let dbSchema = document.getElementById("db_schema");
+        if (dbSchema.value.trim() === "") {
+          dbSchema.classList.add("is-invalid");
+          isValid = false;
+        } else {
+          dbSchema.classList.remove("is-invalid");
+        }
+
+        // Validate User
+        let dbUser = document.getElementById("db_user");
+        if (dbUser.value.trim() === "") {
+          dbUser.classList.add("is-invalid");
+          isValid = false;
+        } else {
+          dbUser.classList.remove("is-invalid");
+        }
+
+        // Validate Password
+        let dbPassword = document.getElementById("db_password");
+        if (dbPassword.value.trim() === "") {
+          dbPassword.classList.add("is-invalid");
+          isValid = false;
+        } else {
+          dbPassword.classList.remove("is-invalid");
+        }
+
+        if (!isValid) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      });
+    });
+  </script>
+
+  <style>
+    .card {
+      border-radius: 8px;
+      border: none;
+    }
+    .btn-soft-violet {
+      background-color: #b992fd;
+      color: white;
+      border: none;
+    }
+    .btn-soft-violet:hover {
+      background-color: #7e57c2;
+    }
+  </style>
+{% endblock %}
