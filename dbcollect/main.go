@@ -178,6 +178,9 @@ func collectData(djangoDB, dataCentralDB *sql.DB, schemaName string) error {
 
 // Main collection logic
 func runCollection(config Config) error {
+	log.Printf("DJANGO_DB_CONN: %s", config.DjangoDBConn)
+	log.Printf("DATA_CENTRAL_CONN: %s", config.DataCentralConn)
+
 	djangoDB, err := connectDB(config.DjangoDBConn, 3)
 	if err != nil {
 		return fmt.Errorf("django_db connection failed: %v", err)
@@ -195,9 +198,14 @@ func runCollection(config Config) error {
 		return fmt.Errorf("failed to fetch schema names: %v", err)
 	}
 
+	if len(projects) == 0 {
+		log.Println("No schemas found in billing_projectinfo, skipping table creation and data insertion")
+		return nil
+	}
+
 	for _, project := range projects {
 		if err := createTable(dataCentralDB, project.SchemaName); err != nil {
-			log.Printf("Error creating table: %v", err)
+			log.Printf("Error creating table %s: %v", project.SchemaName, err)
 			continue
 		}
 		if err := collectData(djangoDB, dataCentralDB, project.SchemaName); err != nil {
