@@ -102,6 +102,7 @@ services:
       DC_DB_PASSWORD: ${DC_DB_PASSWORD}
       DC_DB_HOST: centraldb
       DC_DB_PORT: ${DC_DB_PASSWORD}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/timezone:/etc/timezone:ro
