@@ -10,5 +10,7 @@ done
 echo "PostgreSQL started"
 
 # Apply DB migrations and start server
+python manage.py makemigrations billing
+python manage.py migrate billing
 python manage.py migrate
 exec "$@"
