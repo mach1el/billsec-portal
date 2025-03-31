@@ -17,7 +17,11 @@ type Config struct {
 }
 
 type ProjectInfo struct {
+	Host       string
+	Port       int
 	SchemaName string
+	User       string
+	Password   string
 }
 
 // Load configuration from environment variables
@@ -54,9 +58,9 @@ func connectDB(connStr string, retries int) (*sql.DB, error) {
 	return nil, fmt.Errorf("failed to connect after %d retries: %v", retries, err)
 }
 
-// Fetch schema names from billing_projectinfo
+// Fetch connection details from billing_projectinfo
 func getSchemaNames(db *sql.DB) ([]ProjectInfo, error) {
-	rows, err := db.Query("SELECT schema_name FROM billing_projectinfo")
+	rows, err := db.Query("SELECT host, port, schema_name, \"user\", password FROM billing_projectinfo")
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %v", err)
 	}
@@ -65,7 +69,7 @@ func getSchemaNames(db *sql.DB) ([]ProjectInfo, error) {
 	var projects []ProjectInfo
 	for rows.Next() {
 		var p ProjectInfo
-		if err := rows.Scan(&p.SchemaName); err != nil {
+		if err := rows.Scan(&p.Host, &p.Port, &p.SchemaName, &p.User, &p.Password); err != nil {
 			return nil, err
 		}
 		projects = append(projects, p)
@@ -129,13 +133,13 @@ func createTable(dataCentralDB *sql.DB, schemaName string) error {
 	return nil
 }
 
-// Collect data from acc table and insert into data_central
-func collectData(djangoDB, dataCentralDB *sql.DB, schemaName string) error {
-	query := fmt.Sprintf(`
-		SELECT id, method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
+// Collect data from acc table in target database and insert into data_central, excluding id
+func collectData(targetDB, dataCentralDB *sql.DB, schemaName string) error {
+	query := `
+		SELECT method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
 		       duration, ms_duration, setuptime, created, src_ip, dst_ip, agent, prefix, carrier 
-		FROM %s.acc`, schemaName)
-	rows, err := djangoDB.Query(query)
+		FROM acc`
+	rows, err := targetDB.Query(query)
 	if err != nil {
 		return fmt.Errorf("failed to query acc table for %s: %v", schemaName, err)
 	}
@@ -143,15 +147,13 @@ func collectData(djangoDB, dataCentralDB *sql.DB, schemaName string) error {
 
 	insertQuery := fmt.Sprintf(`
 		INSERT INTO %s (
-			id, method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
+			method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
 			duration, ms_duration, setuptime, created, src_ip, dst_ip, agent, prefix, carrier
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-		ON CONFLICT (id) DO NOTHING`, schemaName)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`, schemaName)
 
 	count := 0
 	for rows.Next() {
-		var id int
 		var method, fromTag, toTag, callid, sipCode, sipReason string
 		var timeVal time.Time
 		var duration, msDuration, setuptime int
@@ -160,12 +162,12 @@ func collectData(djangoDB, dataCentralDB *sql.DB, schemaName string) error {
 		var prefix sql.NullInt32
 		var carrier sql.NullString
 
-		if err := rows.Scan(&id, &method, &fromTag, &toTag, &callid, &sipCode, &sipReason, &timeVal,
+		if err := rows.Scan(&method, &fromTag, &toTag, &callid, &sipCode, &sipReason, &timeVal,
 			&duration, &msDuration, &setuptime, &created, &srcIP, &dstIP, &agent, &prefix, &carrier); err != nil {
 			return fmt.Errorf("scan failed for %s: %v", schemaName, err)
 		}
 
-		_, err := dataCentralDB.Exec(insertQuery, id, method, fromTag, toTag, callid, sipCode, sipReason, timeVal,
+		_, err := dataCentralDB.Exec(insertQuery, method, fromTag, toTag, callid, sipCode, sipReason, timeVal,
 			duration, msDuration, setuptime, created, srcIP, dstIP, agent, prefix, carrier)
 		if err != nil {
 			return fmt.Errorf("insert failed for %s: %v", schemaName, err)
@@ -181,18 +183,21 @@ func runCollection(config Config) error {
 	log.Printf("DJANGO_DB_CONN: %s", config.DjangoDBConn)
 	log.Printf("DATA_CENTRAL_CONN: %s", config.DataCentralConn)
 
+	// Connect to Django DB to get metadata
 	djangoDB, err := connectDB(config.DjangoDBConn, 3)
 	if err != nil {
 		return fmt.Errorf("django_db connection failed: %v", err)
 	}
 	defer djangoDB.Close()
 
+	// Connect to data_central for storage
 	dataCentralDB, err := connectDB(config.DataCentralConn, 3)
 	if err != nil {
 		return fmt.Errorf("data_central connection failed: %v", err)
 	}
 	defer dataCentralDB.Close()
 
+	// Fetch target database connection details
 	projects, err := getSchemaNames(djangoDB)
 	if err != nil {
 		return fmt.Errorf("failed to fetch schema names: %v", err)
@@ -204,11 +209,26 @@ func runCollection(config Config) error {
 	}
 
 	for _, project := range projects {
+		// Construct connection string for target database
+		targetConnStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+			project.Host, project.Port, project.User, project.Password, project.SchemaName)
+
+		// Connect to the target database
+		targetDB, err := connectDB(targetConnStr, 3)
+		if err != nil {
+			log.Printf("Failed to connect to target DB %s: %v", project.SchemaName, err)
+			continue
+		}
+		defer targetDB.Close()
+
+		// Create table in data_central if it doesn’t exist
 		if err := createTable(dataCentralDB, project.SchemaName); err != nil {
 			log.Printf("Error creating table %s: %v", project.SchemaName, err)
 			continue
 		}
-		if err := collectData(djangoDB, dataCentralDB, project.SchemaName); err != nil {
+
+		// Collect data from target DB and insert into data_central
+		if err := collectData(targetDB, dataCentralDB, project.SchemaName); err != nil {
 			log.Printf("Error collecting data for %s: %v", project.SchemaName, err)
 			continue
 		}
