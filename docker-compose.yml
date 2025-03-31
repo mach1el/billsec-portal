@@ -1,0 +1,122 @@
+services:
+  maindb:
+    image: mich43l/postgresql
+    container_name: "billsec-db"
+    restart: on-failure
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64M
+    networks:
+      - internal
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - main-data:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  centraldb:
+    image: mich43l/postgresql
+    container_name: "data_central"
+    restart: on-failure
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64M
+    networks:
+      - internal
+    ports:
+      - "2345:5432"
+    environment:
+      POSTGRES_USER: ${DC_DB_USER}
+      POSTGRES_PASSWORD: ${DC_DB_PASSWORD}
+      POSTGRES_DB: ${DC_DB_NAME}
+    volumes:
+      - dc-data:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dbcollect:
+    image: dbcollect:latest
+    build:
+      context: ./dbcollect
+      dockerfile: Dockerfile
+    container_name: dbcollect
+    restart: unless-stopped
+    environment:
+      - DJANGO_DB_CONN=${DJANGO_DB_CONN}
+      - DATA_CENTRAL_CONN=$DATA_CENTRAL_CONN
+    depends_on:
+      maindb:
+        condition: service_healthy
+      centraldb:
+        condition: service_healthy
+    networks:
+      - internal
+    volumes:
+      - ./logs:/app/logs
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  portal:
+    build: .
+    container_name: "billsec-portal"
+    restart: on-failure
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64M
+    networks:
+      - internal
+    ports:
+      - "8000:8000"
+    command: gunicorn billsec_portal.wsgi:application --bind 0.0.0.0:8000
+    entrypoint: ["/docker-entrypoint.sh"]
+    environment:
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: maindb
+      DC_DB_NAME: ${DC_DB_NAME}
+      DC_DB_USER: ${DC_DB_USER}
+      DC_DB_PASSWORD: ${DC_DB_PASSWORD}
+      DC_DB_HOST: centraldb
+      DC_DB_PORT: ${DC_DB_PASSWORD}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+    depends_on:
+      maindb:
+        condition: service_healthy
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  main-data:
+    driver: local
+  
+  dc-data:
+    driver: local

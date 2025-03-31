@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Initialize Admin{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="content-wrapper p-4" style="max-width: 350px; width: 100%; background: #ede7f6; border-radius: 8px;">
+      <h2 class="text-center" style="color: #a377fc;">Setup Admin Account</h2>
+      {% if error %}
+        <p class="text-danger text-center">{{ error }}</p>
+      {% endif %}
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label" style="color: #c88aee;">Username</label>
+          <input type="text" name="username" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="color: #c88aee;">Password</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label" style="color: #c88aee;">Confirm Password</label>
+          <input type="password" name="confirm_password" class="form-control" required>
+        </div>
+        <button type="submit" class="btn w-100" style="background-color: #c88aee; color: white; border: none;">Create Admin</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}
