@@ -133,13 +133,17 @@ func createTable(dataCentralDB *sql.DB, schemaName string) error {
 	return nil
 }
 
-// Collect data from acc table in target database and insert into data_central, excluding id
+// Collect data from acc table in target database and insert into data_central, only for today
 func collectData(targetDB, dataCentralDB *sql.DB, schemaName string) error {
+	// Get today's date at midnight
+	today := time.Now().Truncate(24 * time.Hour)
+
 	query := `
-		SELECT method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
+		SELECT method, from_tag, to_tag, callid, sip_code, sip_reason, 
 		  duration, ms_duration, setuptime, created, src_ip, dst_ip, exten, prefix, carrier 
-		FROM acc`
-	rows, err := targetDB.Query(query)
+		FROM acc 
+		WHERE created >= $1 AND time < $2`
+	rows, err := targetDB.Query(query, today, today.Add(24*time.Hour))
 	if err != nil {
 		return fmt.Errorf("failed to query acc table for %s: %v", schemaName, err)
 	}
@@ -147,34 +151,33 @@ func collectData(targetDB, dataCentralDB *sql.DB, schemaName string) error {
 
 	insertQuery := fmt.Sprintf(`
 		INSERT INTO %s (
-			method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
+			method, from_tag, to_tag, callid, sip_code, sip_reason, 
 			duration, ms_duration, setuptime, created, src_ip, dst_ip, agent, prefix, carrier
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`, schemaName)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`, schemaName)
 
 	count := 0
 	for rows.Next() {
 		var method, fromTag, toTag, callid, sipCode, sipReason string
-		var timeVal time.Time
 		var duration, msDuration, setuptime int
 		var created sql.NullTime
 		var srcIP, dstIP, agent sql.NullString
 		var prefix sql.NullInt32
 		var carrier sql.NullString
 
-		if err := rows.Scan(&method, &fromTag, &toTag, &callid, &sipCode, &sipReason, &timeVal,
+		if err := rows.Scan(&method, &fromTag, &toTag, &callid, &sipCode, &sipReason,
 			&duration, &msDuration, &setuptime, &created, &srcIP, &dstIP, &agent, &prefix, &carrier); err != nil {
 			return fmt.Errorf("scan failed for %s: %v", schemaName, err)
 		}
 
-		_, err := dataCentralDB.Exec(insertQuery, method, fromTag, toTag, callid, sipCode, sipReason, timeVal,
+		_, err := dataCentralDB.Exec(insertQuery, method, fromTag, toTag, callid, sipCode, sipReason,
 			duration, msDuration, setuptime, created, srcIP, dstIP, agent, prefix, carrier)
 		if err != nil {
 			return fmt.Errorf("insert failed for %s: %v", schemaName, err)
 		}
 		count++
 	}
-	log.Printf("Inserted %d rows into %s", count, schemaName)
+	log.Printf("Inserted %d rows into %s for today (%s)", count, schemaName, today.Format("2006-01-02"))
 	return nil
 }
 
