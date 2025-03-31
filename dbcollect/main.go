@@ -137,7 +137,7 @@ func createTable(dataCentralDB *sql.DB, schemaName string) error {
 func collectData(targetDB, dataCentralDB *sql.DB, schemaName string) error {
 	query := `
 		SELECT method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
-		       duration, ms_duration, setuptime, created, src_ip, dst_ip, agent, prefix, carrier 
+		  duration, ms_duration, setuptime, created, src_ip, dst_ip, exten, prefix, carrier 
 		FROM acc`
 	rows, err := targetDB.Query(query)
 	if err != nil {
