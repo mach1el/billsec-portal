@@ -1,44 +1,10 @@
-# FROM mich43l/alpine
-
-# LABEL architecture="x86_64"                        \
-#       build-date="$BUILD_DATE"                     \
-#       license="MIT"                                \
-#       name="mich43l/billsec_portal"                \
-#       summary="Billsec portal for SIP CDR report"  \
-#       vcs-type="git"                               \
-#       vcs-url="https://github.com/mach1el/billsec-portal"
-
-# RUN apk add py3-django py3-psycopg2 py3-dotenv --no-cache && rm -rf /var/cache/apk/*
-
-# ADD . $USER_HOME
-
-# WORKDIR $USER_HOME/billsec_portal
-
-# RUN python manage.py makemigrations
-# RUN python manage.py migrate
-
-# ENV DB_NAME \
-#   DB_USER \
-#   DB_PASSWORD \
-#   DB_HOST=localhost \
-#   DB_PORT=5432 \
-#   DC_DB_NAME \
-#   DC_DB_USER \
-#   DC_DB_PASSWORD \
-#   DC_DB_HOST=localhost \
-#   DC_DB_PORT=5432
-
-# EXPOSE 8000
-
-# ADD units /
-# RUN chmod +x /etc/service/*/*
-
 FROM python:3.11-slim
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV PATH="/root/.local/bin:$PATH"
+ENV TIME_ZONE=$TIME_ZONE \
+  PYTHONDONTWRITEBYTECODE=1 \
+  PYTHONUNBUFFERED=1 \
+  PATH="/root/.local/bin:$PATH"
 
 # Install OS dependencies
 RUN apt-get update && apt-get install -y \
