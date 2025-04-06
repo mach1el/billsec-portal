@@ -2,10 +2,10 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.messages import get_messages
 from django.contrib.auth.decorators import login_required
+from django.db import connections
 from django.db.utils import OperationalError, ProgrammingError
 from .models import ProjectInfo
 from .forms import ReportFilterForm
-from utils import get_data_central_connection
 
 def home(request):
   if not request.user.is_authenticated:
@@ -15,25 +15,34 @@ def home(request):
   total_charge = 0
 
   if request.method == "POST":
-    form = ReportFilterForm(request.POST or None)
+    form = ReportFilterForm(request.POST)
     if form.is_valid():
       datetime_from = form.cleaned_data['datetime_from']
       datetime_to = form.cleaned_data['datetime_to']
       project_schema = form.cleaned_data['project']
 
-      if project_schema:
-        table_name = project_schema
+      if datetime_from and datetime_to:
+        from django.utils.timezone import make_naive
+        datetime_from = make_naive(datetime_from)
+        datetime_to = make_naive(datetime_to)
 
+      if project_schema:
         try:
-          conn = get_data_central_connection()
-          with conn.cursor() as cursor:
+          with connections['data_central'].cursor() as cursor:
             query = f"""
-              SELECT carrier, SUM(duration) AS total_seconds
-              FROM "{table_name}"
+              SELECT carrier,
+                    SUM(
+                      CASE
+                        WHEN duration < 6 THEN 6
+                        ELSE duration
+                      END
+                    ) AS total_seconds
+              FROM "{project_schema}"
               WHERE created BETWEEN %s AND %s
               GROUP BY carrier
               ORDER BY carrier ASC
             """
+
             cursor.execute(query, [datetime_from, datetime_to])
             rows = cursor.fetchall()
 
