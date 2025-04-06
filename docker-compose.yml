@@ -101,7 +101,6 @@ services:
       DC_DB_USER: ${DC_DB_USER}
       DC_DB_PASSWORD: ${DC_DB_PASSWORD}
       DC_DB_HOST: centraldb
-      DC_DB_PORT: ${DC_DB_PASSWORD}
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       TIME_ZONE: ${TIME_ZONE}
     volumes:

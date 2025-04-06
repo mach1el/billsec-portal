@@ -22,8 +22,7 @@ urlpatterns = [
   path('admin/', admin.site.urls),
   path('', lambda request: redirect('billing:home'), name='root'),
   path('', include('users.urls')),
-  path('', include("billing.urls")),
+  path('', include('billing.urls')),
   path('', include('cdr.urls')),
   path('', include('projects_management.urls')),
-
 ]

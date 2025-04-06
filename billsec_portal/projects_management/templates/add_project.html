@@ -32,15 +32,15 @@
           </div>
           <div class="col-md-4">
             <label for="db_schema" class="form-label">Database Schema</label>
-            <input type="text" id="db_schema" name="db_schema" class="form-control" placeholder="e.g. public" required>
+            <input type="text" id="db_schema" name="db_schema" class="form-control" placeholder="e.g. project_schema" required>
             <div class="invalid-feedback">Please enter a valid schema.</div>
           </div>
         </div>
-        
+
         <div class="row mt-3">
           <div class="col-md-6">
             <label for="db_user" class="form-label">Database User</label>
-            <input type="text" id="db_user" name="db_user" class="form-control" placeholder="e.g. admin" required>
+            <input type="text" id="db_user" name="db_user" class="form-control" placeholder="e.g. dbuser" required>
             <div class="invalid-feedback">Please enter a database user.</div>
           </div>
           <div class="col-md-6">
@@ -51,64 +51,34 @@
         </div>
 
         <div class="mt-4 text-end">
-          <button type="submit" class="btn btn-soft-violet"><i class="fas fa-save"></i> Save Project</button>
-          <a href="{% url 'billing:home' %}" class="btn btn-outline-secondary"><i class="fas fa-times"></i> Cancel</a>
+          <button type="submit" class="btn btn-soft-violet">
+            <i class="fas fa-save"></i> Save Project
+          </button>
+          <a href="{% url 'projects_management:list' %}" class="btn btn-outline-secondary">
+            <i class="fas fa-times"></i> Cancel
+          </a>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Frontend Form Validation -->
+  <!-- Frontend Validation -->
   <script>
     document.addEventListener("DOMContentLoaded", function() {
-      let form = document.getElementById("project-form");
+      const form = document.getElementById("project-form");
       form.addEventListener("submit", function(event) {
         let isValid = true;
 
-        // Validate Host
-        let dbHost = document.getElementById("db_host");
-        if (dbHost.value.trim() === "") {
-          dbHost.classList.add("is-invalid");
-          isValid = false;
-        } else {
-          dbHost.classList.remove("is-invalid");
-        }
-
-        // Validate Port
-        let dbPort = document.getElementById("db_port");
-        if (dbPort.value < 0 || dbPort.value > 65535 || dbPort.value.trim() === "") {
-          dbPort.classList.add("is-invalid");
-          isValid = false;
-        } else {
-          dbPort.classList.remove("is-invalid");
-        }
-
-        // Validate Schema
-        let dbSchema = document.getElementById("db_schema");
-        if (dbSchema.value.trim() === "") {
-          dbSchema.classList.add("is-invalid");
-          isValid = false;
-        } else {
-          dbSchema.classList.remove("is-invalid");
-        }
-
-        // Validate User
-        let dbUser = document.getElementById("db_user");
-        if (dbUser.value.trim() === "") {
-          dbUser.classList.add("is-invalid");
-          isValid = false;
-        } else {
-          dbUser.classList.remove("is-invalid");
-        }
-
-        // Validate Password
-        let dbPassword = document.getElementById("db_password");
-        if (dbPassword.value.trim() === "") {
-          dbPassword.classList.add("is-invalid");
-          isValid = false;
-        } else {
-          dbPassword.classList.remove("is-invalid");
-        }
+        // Validate each field
+        ["db_host", "db_port", "db_schema", "db_user", "db_password"].forEach(id => {
+          const field = document.getElementById(id);
+          if (!field.value.trim() || (id === "db_port" && (field.value < 0 || field.value > 65535))) {
+            field.classList.add("is-invalid");
+            isValid = false;
+          } else {
+            field.classList.remove("is-invalid");
+          }
+        });
 
         if (!isValid) {
           event.preventDefault();
