@@ -14,6 +14,7 @@ import (
 type Config struct {
 	DjangoDBConn    string
 	DataCentralConn string
+	RunOnStart      bool
 }
 
 type ProjectInfo struct {
@@ -29,6 +30,7 @@ func loadConfig() (Config, error) {
 	config := Config{
 		DjangoDBConn:    os.Getenv("DJANGO_DB_CONN"),
 		DataCentralConn: os.Getenv("DATA_CENTRAL_CONN"),
+		RunOnStart:      os.Getenv("RUN_ON_START") == "true",
 	}
 
 	if config.DjangoDBConn == "" || config.DataCentralConn == "" {
@@ -140,7 +142,7 @@ func collectData(targetDB, dataCentralDB *sql.DB, schemaName string) error {
 
 	query := `
 		SELECT method, from_tag, to_tag, callid, sip_code, sip_reason, time, 
-		  duration, ms_duration, setuptime, created, src_ip, dst_ip, exten, prefix, carrier 
+		       duration, ms_duration, setuptime, created, src_ip, dst_ip, agent, prefix, carrier 
 		FROM acc 
 		WHERE created >= $1 AND time < $2`
 	rows, err := targetDB.Query(query, today, today.Add(24*time.Hour))
@@ -246,10 +248,14 @@ func main() {
 		log.Fatalf("Config load failed: %v", err)
 	}
 
-	// Run once at startup
-	log.Println("Starting dbcollect service...")
-	if err := runCollection(config); err != nil {
-		log.Printf("Initial run failed: %v", err)
+	// Only run on startup if explicitly enabled
+	if config.RunOnStart {
+		log.Println("Starting dbcollect service with run-on-start enabled...")
+		if err := runCollection(config); err != nil {
+			log.Printf("Initial run failed: %v", err)
+		}
+	} else {
+		log.Println("Starting dbcollect service, waiting for scheduled run at 23:00...")
 	}
 
 	// Schedule daily run at 23:00

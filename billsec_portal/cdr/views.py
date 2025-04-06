@@ -1,7 +1,7 @@
 import csv
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
-from utils import get_data_central_connection
+from django.db import connections
 from .forms import CDRFilterForm
 
 def cdr_report(request):
@@ -16,8 +16,7 @@ def cdr_report(request):
       schema = form.cleaned_data['project']
 
       try:
-        conn = get_data_central_connection()
-        with conn.cursor() as cursor:
+        with connections['data_central'].cursor() as cursor:
           cursor.execute(f"""
             SELECT * FROM "{schema}"
             WHERE created BETWEEN %s AND %s
