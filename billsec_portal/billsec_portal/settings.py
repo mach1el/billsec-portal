@@ -27,9 +27,10 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
+LOGIN_URL = '/login'
+LOGIN_REDIRECT_URL = '/home'
+LOGOUT_REDIRECT_URL = '/login'
 APPEND_SLASH = False
-LOGIN_REDIRECT_URL = "home"
-LOGOUT_REDIRECT_URL = "login"
 
 # Application definition
 INSTALLED_APPS = [
@@ -47,6 +48,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+  'middlewares.nocache_middleware.NoCacheMiddleware',
   'django.middleware.security.SecurityMiddleware',
   'django.contrib.sessions.middleware.SessionMiddleware',
   'django.middleware.common.CommonMiddleware',

@@ -1,19 +1,27 @@
 import csv
 from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.db import connections
+from django.contrib.auth.decorators import login_required
 from .forms import CDRFilterForm
+from django.utils.timezone import make_naive
 
+@login_required
 def cdr_report(request):
   report_data = []
   headers = []
 
   if request.method == "POST":
-    form = CDRFilterForm(request.POST or None)
+    form = CDRFilterForm(request.POST)
     if form.is_valid():
       datetime_from = form.cleaned_data['datetime_from']
       datetime_to = form.cleaned_data['datetime_to']
       schema = form.cleaned_data['project']
+
+      # Ensure datetime is naive (remove timezone info)
+      if datetime_from and datetime_to:
+        datetime_from = make_naive(datetime_from)
+        datetime_to = make_naive(datetime_to)
 
       try:
         with connections['data_central'].cursor() as cursor:
@@ -37,6 +45,8 @@ def cdr_report(request):
     "report_data": report_data
   })
 
+
+@login_required
 def export_cdr_csv(request):
   """Exports the filtered CDR report to CSV."""
   if request.method == "POST":
@@ -46,14 +56,18 @@ def export_cdr_csv(request):
       datetime_to = form.cleaned_data['datetime_to']
       schema = form.cleaned_data['project']
 
+      # Ensure datetime is naive (remove timezone info)
+      if datetime_from and datetime_to:
+        datetime_from = make_naive(datetime_from)
+        datetime_to = make_naive(datetime_to)
+
       response = HttpResponse(content_type='text/csv')
       response['Content-Disposition'] = f'attachment; filename="cdr_report_{schema}.csv"'
 
       writer = csv.writer(response)
-      
+
       try:
-        conn = get_data_central_connection()
-        with conn.cursor() as cursor:
+        with connections['data_central'].cursor() as cursor:
           cursor.execute(f"""
             SELECT * FROM "{schema}"
             WHERE created BETWEEN %s AND %s
@@ -63,6 +77,7 @@ def export_cdr_csv(request):
           headers = [col[0] for col in cursor.description]
           rows = cursor.fetchall()
 
+        # Write header and rows to CSV
         writer.writerow(headers)
         for row in rows:
           writer.writerow(row)
