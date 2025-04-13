@@ -4,120 +4,156 @@
 {% block title %}Full CDR Report - Billsec Portal{% endblock %}
 
 {% block content %}
-  <div class="container mt-4">
-    <h2 class="text-primary mb-4"><i class="fas fa-list"></i> Full CDR Report</h2>
-    <div class="card p-4 shadow-sm mb-4">
-      <form method="POST">
-        {% csrf_token %}
-        <div class="row">
-          <div class="col-md-3">
-            <label for="{{ form.datetime_from.id_for_label }}" class="form-label">From</label>
-            <div class="input-group">
-              {{ form.datetime_from }}
-              <span class="input-group-text calendar-icon"><i class="fas fa-calendar-alt"></i></span>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <label for="{{ form.datetime_to.id_for_label }}" class="form-label">To</label>
-            <div class="input-group">
-              {{ form.datetime_to }}
-              <span class="input-group-text calendar-icon"><i class="fas fa-calendar-alt"></i></span>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <label for="{{ form.project.id_for_label }}" class="form-label">Project</label>
-            {{ form.project }}
-          </div>
-          <div class="col-md-3 d-flex align-items-end">
-            <button type="submit" class="btn btn-soft-violet w-100">
-              <i class="fas fa-search"></i> Show CDRs
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
+<div class="container mt-4">
+  <h2 class="text-primary mb-4"><i class="fas fa-list"></i> Full CDR Report</h2>
 
-    {% if report_data %}
-      <div class="card p-3 shadow-sm">
-        <!-- Export CSV Button (Insert here) -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5><i class="fas fa-table"></i> Report Results</h5>
-          <form method="POST" action="{% url 'cdr:export_csv' %}">
-            {% csrf_token %}
-            <input type="hidden" name="datetime_from" value="{{ form.datetime_from.value }}">
-            <input type="hidden" name="datetime_to" value="{{ form.datetime_to.value }}">
-            <input type="hidden" name="project" value="{{ form.project.value }}">
-            <button type="submit" class="btn btn-success">
-              <i class="fas fa-file-csv"></i> Export CSV
-            </button>
-          </form>
+  <div class="card p-4 shadow-sm mb-4">
+    <form method="POST">
+      {% csrf_token %}
+      <div class="row">
+        <div class="col-md-3">
+          <label for="{{ form.datetime_from.id_for_label }}" class="form-label">From</label>
+          <div class="input-group">
+            {{ form.datetime_from }}
+            <span class="input-group-text calendar-icon"><i class="fas fa-calendar-alt"></i></span>
+          </div>
         </div>
-        
-        <!-- CDR Report Table -->
-        <div class="table-responsive">
-          <table class="table table-bordered table-hover table-sm w-100">
-            <thead class="table-light">
-              <tr>
-                {% for header in headers %}
-                  <th>{{ header|capfirst }}</th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in report_data %}
-                <tr>
-                  {% for col in row %}
-                    <td>{{ col }}</td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        <div class="col-md-3">
+          <label for="{{ form.datetime_to.id_for_label }}" class="form-label">To</label>
+          <div class="input-group">
+            {{ form.datetime_to }}
+            <span class="input-group-text calendar-icon"><i class="fas fa-calendar-alt"></i></span>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label for="{{ form.project.id_for_label }}" class="form-label">Project</label>
+          {{ form.project }}
+        </div>
+        <div class="col-md-3 d-flex align-items-end">
+          <button type="submit" class="btn btn-soft-violet w-100">
+            <i class="fas fa-search"></i> Show CDRs
+          </button>
         </div>
       </div>
-    {% elif report_data is not none %}
-      <div class="alert alert-warning mt-3"><i class="fas fa-info-circle"></i> No CDRs found.</div>
-    {% endif %}
+    </form>
   </div>
 
-  <!-- Flatpickr -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      flatpickr(".datetimepicker", {
-        enableTime: true,
-        dateFormat: "Y-m-d H:i",
-        time_24hr: true
-      });
+  {% if headers %}
+    <div class="card p-3 shadow-sm">
+      <!-- Export CSV Button -->
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="fas fa-table"></i> Report Results</h5>
+        <form method="POST" action="{% url 'cdr:export_csv' %}">
+          {% csrf_token %}
+          <input type="hidden" name="datetime_from" value="{{ form.datetime_from.value }}">
+          <input type="hidden" name="datetime_to" value="{{ form.datetime_to.value }}">
+          <input type="hidden" name="project" value="{{ form.project.value }}">
+          <button type="submit" class="btn btn-success">
+            <i class="fas fa-file-csv"></i> Export CSV
+          </button>
+        </form>
+      </div>
+
+      <!-- CDR Report Table -->
+      <div class="table-responsive">
+        <table class="table table-bordered table-hover table-sm w-100">
+          <thead class="table-light">
+            <tr>
+              {% for header in headers %}
+                <th>{{ header|capfirst }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in page_data %}
+              <tr>
+                {% for col in row %}
+                  <td>{{ col }}</td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="d-flex justify-content-center mt-3">
+        <nav>
+          <ul class="pagination">
+            {% if page_data.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page=1">&laquo; First</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_data.previous_page_number }}">Previous</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">&laquo; First</span></li>
+              <li class="page-item disabled"><span class="page-link">Previous</span></li>
+            {% endif %}
+
+            <li class="page-item disabled">
+              <span class="page-link">Page {{ page_data.number }} of {{ page_data.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_data.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_data.next_page_number }}">Next</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_data.paginator.num_pages }}">Last &raquo;</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled"><span class="page-link">Next</span></li>
+              <li class="page-item disabled"><span class="page-link">Last &raquo;</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    </div>
+  {% elif headers is not none %}
+    <div class="alert alert-warning mt-3">
+      <i class="fas fa-info-circle"></i> No CDRs found.
+    </div>
+  {% endif %}
+</div>
+
+<!-- Flatpickr -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    flatpickr(".datetimepicker", {
+      enableTime: true,
+      dateFormat: "Y-m-d H:i",
+      time_24hr: true
     });
-  </script>
+  });
+</script>
 
-  <style>
-    .calendar-icon { cursor: pointer; }
-    .btn-soft-violet {
-      background-color: #b992fd;
-      color: white;
-      border: none;
-    }
-    .btn-soft-violet:hover {
-      background-color: #7e57c2;
-    }
-    .table-responsive {
-      overflow-x: auto;
-      white-space: nowrap;
-    }
-
-    .table th,
-    .table td {
-      vertical-align: middle;
-      padding: 8px 12px;
-      white-space: nowrap; /* Prevent text wrapping */
-    }
-
-    .table th {
-      background-color: #f8f9fa;
-      font-weight: bold;
-    }
-  </style>
+<!-- Styles -->
+<style>
+  .calendar-icon { cursor: pointer; }
+  .btn-soft-violet {
+    background-color: #b992fd;
+    color: white;
+    border: none;
+  }
+  .btn-soft-violet:hover {
+    background-color: #7e57c2;
+  }
+  .table-responsive {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .table th, .table td {
+    vertical-align: middle;
+    padding: 8px 12px;
+    white-space: nowrap;
+  }
+  .table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+  }
+</style>
 {% endblock %}
