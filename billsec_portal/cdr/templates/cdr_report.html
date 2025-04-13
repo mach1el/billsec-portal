@@ -77,18 +77,18 @@
       </div>
 
       <!-- Pagination -->
-      <div class="d-flex justify-content-center mt-3">
-        <nav>
-          <ul class="pagination">
+      {% if page_data.has_other_pages %}
+        <nav class="mt-3">
+          <ul class="pagination justify-content-center">
             {% if page_data.has_previous %}
               <li class="page-item">
-                <a class="page-link" href="?page=1">&laquo; First</a>
+                <a class="page-link" href="?page=1&datetime_from={{ form.datetime_from.value }}&datetime_to={{ form.datetime_to.value }}&project={{ form.project.value }}">« First</a>
               </li>
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_data.previous_page_number }}">Previous</a>
+                <a class="page-link" href="?page={{ page_data.previous_page_number }}&datetime_from={{ form.datetime_from.value }}&datetime_to={{ form.datetime_to.value }}&project={{ form.project.value }}">Previous</a>
               </li>
             {% else %}
-              <li class="page-item disabled"><span class="page-link">&laquo; First</span></li>
+              <li class="page-item disabled"><span class="page-link">« First</span></li>
               <li class="page-item disabled"><span class="page-link">Previous</span></li>
             {% endif %}
 
@@ -98,18 +98,18 @@
 
             {% if page_data.has_next %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_data.next_page_number }}">Next</a>
+                <a class="page-link" href="?page={{ page_data.next_page_number }}&datetime_from={{ form.datetime_from.value }}&datetime_to={{ form.datetime_to.value }}&project={{ form.project.value }}">Next</a>
               </li>
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_data.paginator.num_pages }}">Last &raquo;</a>
+                <a class="page-link" href="?page={{ page_data.paginator.num_pages }}&datetime_from={{ form.datetime_from.value }}&datetime_to={{ form.datetime_to.value }}&project={{ form.project.value }}">Last »</a>
               </li>
             {% else %}
               <li class="page-item disabled"><span class="page-link">Next</span></li>
-              <li class="page-item disabled"><span class="page-link">Last &raquo;</span></li>
+              <li class="page-item disabled"><span class="page-link">Last »</span></li>
             {% endif %}
           </ul>
         </nav>
-      </div>
+      {% endif %}
     </div>
   {% elif headers is not none %}
     <div class="alert alert-warning mt-3">
