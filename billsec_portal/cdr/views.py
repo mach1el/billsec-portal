@@ -1,6 +1,6 @@
 import csv
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.db import connections
 from django.contrib.auth.decorators import login_required
 from django.http import StreamingHttpResponse, HttpResponse
@@ -14,30 +14,44 @@ class Echo:
 
 @login_required
 def cdr_report(request):
-  """Display paginated CDR report."""
   headers = []
   report_data = []
 
-  form = CDRFilterForm(request.POST or None)
+  if request.method == "POST":
+    form = CDRFilterForm(request.POST)
+    if form.is_valid():
+      datetime_from = form.cleaned_data['datetime_from']
+      datetime_to = form.cleaned_data['datetime_to']
+      project_schema = form.cleaned_data['project']
 
-  if request.method == "POST" and form.is_valid():
-    datetime_from = form.cleaned_data['datetime_from']
-    datetime_to = form.cleaned_data['datetime_to']
-    schema = form.cleaned_data['project']
+      # 👇 after POST and valid, redirect to GET
+      query_params = f"?datetime_from={datetime_from.strftime('%Y-%m-%dT%H:%M')}&datetime_to={datetime_to.strftime('%Y-%m-%dT%H:%M')}&project={project_schema}"
+      return redirect(f"{request.path}{query_params}")
 
-    try:
-      with connections['data_central'].cursor() as cursor:
-        cursor.execute(f"""
-          SELECT * FROM "{schema}"
-          WHERE created BETWEEN %s AND %s
-          ORDER BY created DESC
-        """, [datetime_from, datetime_to])
+  else:
+    form = CDRFilterForm(request.GET or None)
+    if form.is_valid():
+      datetime_from = form.cleaned_data['datetime_from']
+      datetime_to = form.cleaned_data['datetime_to']
+      project_schema = form.cleaned_data['project']
 
-        headers = [col[0] for col in cursor.description]
-        report_data = cursor.fetchall()
+      report_data = []
+      headers = []
 
-    except Exception as e:
-      form.add_error(None, f"⚠️ Database error: {str(e)}")
+      if datetime_from and datetime_to and project_schema:
+        try:
+          with connections['data_central'].cursor() as cursor:
+            cursor.execute(f"""
+              SELECT * FROM "{project_schema}"
+              WHERE created BETWEEN %s AND %s
+              ORDER BY created DESC
+            """, [datetime_from, datetime_to])
+
+            headers = [col[0] for col in cursor.description]
+            report_data = cursor.fetchall()
+
+        except Exception as e:
+          form.add_error(None, f"⚠️ Database error: {str(e)}")
 
   paginator = Paginator(report_data, 100)
   page = request.GET.get('page')
@@ -58,7 +72,7 @@ def cdr_report(request):
 
 @login_required
 def export_cdr_csv(request):
-  """Exports CDR as streaming CSV."""
+  """Exports CDR as a streaming CSV without closing cursor too early."""
   if request.method == "POST":
     form = CDRFilterForm(request.POST)
     if form.is_valid():
@@ -75,24 +89,23 @@ def export_cdr_csv(request):
           """, [datetime_from, datetime_to])
 
           headers = [col[0] for col in cursor.description]
+          rows = cursor.fetchall()   # <-- 🚨 fetch all data into memory now
 
-          pseudo_buffer = Echo()
-          writer = csv.writer(pseudo_buffer)
+        # Now cursor is closed, and we are safe to stream.
+        pseudo_buffer = Echo()
+        writer = csv.writer(pseudo_buffer)
 
-          def stream_rows():
-            yield writer.writerow(headers)
-            while True:
-              row = cursor.fetchone()
-              if row is None:
-                break
-              yield writer.writerow(row)
+        def stream_rows():
+          yield writer.writerow(headers)
+          for row in rows:    # <-- streaming from rows, NOT cursor anymore
+            yield writer.writerow(row)
 
-          response = StreamingHttpResponse(
-            stream_rows(),
-            content_type="text/csv"
-          )
-          response['Content-Disposition'] = f'attachment; filename="cdr_report_{schema}.csv"'
-          return response
+        response = StreamingHttpResponse(
+          stream_rows(),
+          content_type="text/csv"
+        )
+        response['Content-Disposition'] = f'attachment; filename="cdr_report_{schema}.csv"'
+        return response
 
       except Exception as e:
         return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
