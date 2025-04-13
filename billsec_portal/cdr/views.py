@@ -1,70 +1,70 @@
 import csv
-from django.http import HttpResponse
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import render
 from django.db import connections
 from django.contrib.auth.decorators import login_required
-from .forms import CDRFilterForm
+from django.http import StreamingHttpResponse, HttpResponse
 from django.utils.timezone import make_naive
+
+from .forms import CDRFilterForm
+class Echo:
+  """An object that implements just the write method of the file-like interface."""
+  def write(self, value):
+    return value
 
 @login_required
 def cdr_report(request):
-  report_data = []
+  """Display paginated CDR report."""
   headers = []
+  report_data = []
 
-  if request.method == "POST":
-    form = CDRFilterForm(request.POST)
-    if form.is_valid():
-      datetime_from = form.cleaned_data['datetime_from']
-      datetime_to = form.cleaned_data['datetime_to']
-      schema = form.cleaned_data['project']
+  form = CDRFilterForm(request.POST or None)
 
-      # Ensure datetime is naive (remove timezone info)
-      if datetime_from and datetime_to:
-        datetime_from = make_naive(datetime_from)
-        datetime_to = make_naive(datetime_to)
+  if request.method == "POST" and form.is_valid():
+    datetime_from = form.cleaned_data['datetime_from']
+    datetime_to = form.cleaned_data['datetime_to']
+    schema = form.cleaned_data['project']
 
-      try:
-        with connections['data_central'].cursor() as cursor:
-          cursor.execute(f"""
-            SELECT * FROM "{schema}"
-            WHERE created BETWEEN %s AND %s
-            ORDER BY created DESC
-          """, [datetime_from, datetime_to])
+    try:
+      with connections['data_central'].cursor() as cursor:
+        cursor.execute(f"""
+          SELECT * FROM "{schema}"
+          WHERE created BETWEEN %s AND %s
+          ORDER BY created DESC
+        """, [datetime_from, datetime_to])
 
-          headers = [col[0] for col in cursor.description]
-          report_data = cursor.fetchall()
+        headers = [col[0] for col in cursor.description]
+        report_data = cursor.fetchall()
 
-      except Exception as e:
-        form.add_error(None, f"Database error: {str(e)}")
-  else:
-    form = CDRFilterForm()
+    except Exception as e:
+      form.add_error(None, f"⚠️ Database error: {str(e)}")
+
+  paginator = Paginator(report_data, 100)
+  page = request.GET.get('page')
+
+  try:
+    page_data = paginator.page(page)
+  except PageNotAnInteger:
+    page_data = paginator.page(1)
+  except EmptyPage:
+    page_data = paginator.page(paginator.num_pages)
 
   return render(request, "cdr_report.html", {
     "form": form,
     "headers": headers,
-    "report_data": report_data
+    "page_data": page_data,
+    "report_data": page_data.object_list
   })
-
 
 @login_required
 def export_cdr_csv(request):
-  """Exports the filtered CDR report to CSV."""
+  """Exports CDR as streaming CSV."""
   if request.method == "POST":
     form = CDRFilterForm(request.POST)
     if form.is_valid():
       datetime_from = form.cleaned_data['datetime_from']
       datetime_to = form.cleaned_data['datetime_to']
       schema = form.cleaned_data['project']
-
-      # Ensure datetime is naive (remove timezone info)
-      if datetime_from and datetime_to:
-        datetime_from = make_naive(datetime_from)
-        datetime_to = make_naive(datetime_to)
-
-      response = HttpResponse(content_type='text/csv')
-      response['Content-Disposition'] = f'attachment; filename="cdr_report_{schema}.csv"'
-
-      writer = csv.writer(response)
 
       try:
         with connections['data_central'].cursor() as cursor:
@@ -75,16 +75,26 @@ def export_cdr_csv(request):
           """, [datetime_from, datetime_to])
 
           headers = [col[0] for col in cursor.description]
-          rows = cursor.fetchall()
 
-        # Write header and rows to CSV
-        writer.writerow(headers)
-        for row in rows:
-          writer.writerow(row)
+          pseudo_buffer = Echo()
+          writer = csv.writer(pseudo_buffer)
+
+          def stream_rows():
+            yield writer.writerow(headers)
+            while True:
+              row = cursor.fetchone()
+              if row is None:
+                break
+              yield writer.writerow(row)
+
+          response = StreamingHttpResponse(
+            stream_rows(),
+            content_type="text/csv"
+          )
+          response['Content-Disposition'] = f'attachment; filename="cdr_report_{schema}.csv"'
+          return response
 
       except Exception as e:
         return HttpResponse(f"Error generating CSV: {str(e)}", status=500)
-
-      return response
 
   return HttpResponse("Invalid request", status=400)
